@@ -5,58 +5,26 @@
 // Description: This module provides a wrapper for the SATA GTX wrapper modules
 //              the Out of Band Signaling controller module and the clock generating
 //              modules
-//              It has been modified from XAPP870 to support Xilinx Virtex 6 GTX
+//              It has been modified from Xilinx XAPP870 to support Virtex 6 GTX
 //              transceivers 
 //*****************************************************************************/
 
-// Copyright (C) 2012
-// Ashwin A. Mendon
-//
-// This file is part of SATA2 core.
-//
-// This program is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.  
-
-
-module sata_phy # 
-(
-    // Refclk attributes
-    parameter   CLKINDC_B           =   "TRUE", 
-    
-    // Channel bonding attributes
-    parameter   CHAN_BOND_MODE_0    =   "OFF",  // "MASTER", "SLAVE", or "OFF"
-    parameter   CHAN_BOND_LEVEL_0   =   0,      // 0 to 7. See UG for details
-    parameter   CHAN_BOND_MODE_1    =   "OFF",  // "MASTER", "SLAVE", or "OFF"
-    parameter   CHAN_BOND_LEVEL_1   =   0       // 0 to 7. See UG for details
-)    
-
+module sata_phy 
 (
 	sata_phy_ila_control,
 	oob_control_ila_control,
-        REFCLK_PAD_P_IN,			// MGTCLKA,  clocks GTP_X0Y0-2 
-	REFCLK_PAD_N_IN,			// MGTCLKA 
-	GTXRESET_IN,			       // GTX initialization
-	PLLLKDET_OUT_N,			// TX PLL LOCK
-
+        REFCLK_PAD_P_IN,	       
+	REFCLK_PAD_N_IN,	       
 	TXP0_OUT,
 	TXN0_OUT,
 	RXP0_IN,
 	RXN0_IN,		
+	PLLLKDET_OUT_N,			
 	DCMLOCKED_OUT,
+	LINKUP_led,
  	GEN2_led,
 	sata_user_clk,
 	LINKUP,
-	LINKUP_led,
 	align_en_out,
         tx_datain,
         tx_charisk_in,
@@ -64,23 +32,25 @@ module sata_phy #
 	rx_charisk_out,
         CurrentState_out,
         rxelecidle_out,
+	GTXRESET_IN,			
         CLKIN_150
-        	);
+ );
     
         parameter  CHIPSCOPE            = "FALSE";
         input  [35:0]   sata_phy_ila_control;
         input  [35:0]   oob_control_ila_control;
-	input		REFCLK_PAD_P_IN;	// GTP reference clock input
-	input		REFCLK_PAD_N_IN;	// GTP reference clock input
-	input		GTXRESET_IN;		// Main GTP reset
+	input		REFCLK_PAD_P_IN;	// GTX reference clock input
+	input		REFCLK_PAD_N_IN;	// GTX reference clock input
 	input           RXP0_IN;		// Receiver input
 	input           RXN0_IN;		// Receiver input
+	input		GTXRESET_IN;		// Main GTX reset
+        input           CLKIN_150;              // GTX reference clock input
         // Input from Link Layer
         input  [31:0]   tx_datain;              
         input           tx_charisk_in;          
        	
 	output		DCMLOCKED_OUT;		// DCM locked 
-	output 		PLLLKDET_OUT_N;			// PLL Lock Detect
+	output 		PLLLKDET_OUT_N;	        // PLL Lock Detect
 	output		TXP0_OUT;
 	output		TXN0_OUT;
 	output		LINKUP;
@@ -94,7 +64,6 @@ module sata_phy #
 	output	[7:0]	CurrentState_out;
         output          rxelecidle_out;
         
-        input           CLKIN_150;
 
 	wire	[3:0]	rxcharisk;
         // OOB generate and detect
@@ -114,20 +83,12 @@ module sata_phy #
 	wire		clk0, clk2x, dcm_clk0, dcm_clkdv, dcm_clk2x; // DCM output clocks
 	wire		mmcm_locked;
 	wire		GEN2; //this is the selection for GEN2 when set to 1
-	wire		system_reset;
 	wire		speed_neg_rst;
-	wire	[6:0]	daddr;	//DRP Address
-	wire        	den;	//DRP enable
-	wire	[15:0]	di;	//DRP data in
-	wire	[15:0]	do;	//DRP data out
-	wire		drdy;	//DRP ready
-	wire		dwe;	//DRP write enable 
-	wire		rxreset;	//GTP Rxreset
+	wire		rxreset;	//GTX Rxreset
 	wire 	        RXBYTEREALIGN0, RXBYTEISALIGNED0;
 	wire 		RXRECCLK0;
 	wire 		mmcm_reset;
 	wire 		rst_debounce;
-	wire 		push_button_rst;
 	wire 		mmcm_clk_in;   
 	wire 		gtx_refclk;   
 	wire 		gtx_refclk_bufg;   
@@ -144,7 +105,6 @@ module sata_phy #
         reg    [15:0]   gtx_txoutclk_count;
         reg    [15:0]   gtx_txusrclk_count;
         reg    [15:0]   gtx_txusrclk2_count;
-        reg    [15:0]   CLKIN_200_count;
         reg    [15:0]   CLKIN_150_count;
 
 	
@@ -262,7 +222,6 @@ module sata_phy #
 
 
 
-
     //----------------------------- Global Signals -----------------------------
     wire            gtx0_tx_system_reset_c;
     wire            gtx0_rx_system_reset_c;
@@ -289,8 +248,24 @@ module sata_phy #
     //--------------------------- Reference Clocks ----------------------------
 
 
-     		
-	assign system_reset = rst_debounce;
+        // Static signal Assigments    
+        assign tied_to_ground_i             = 1'b0;
+        assign tied_to_ground_vec_i         = 64'h0000000000000000;
+        assign tied_to_vcc_i                = 1'b1;
+        assign tied_to_vcc_vec_i            = 8'hff;
+ 
+        // GTX Reset
+        assign rst_0 = GTXRESET_IN;  
+         
+        always @(posedge CLKIN_150)
+        begin
+            rst_1 <= rst_0;
+            rst_2 <= rst_1;
+            rst_3 <= rst_2;
+        end
+
+        assign rst_debounce = (rst_1 & rst_2 & rst_3);
+
 	//assign gtx_reset = rst_debounce|| speed_neg_rst;	
 	assign gtx_reset = rst_debounce;	
 	//assign mmcm_reset = ~PLLLKDET_OUT || speed_neg_rst;
@@ -308,59 +283,8 @@ module sata_phy #
 
         assign rx_dataout = rxdataout;
 
-
-always @(posedge gtx_refclk_bufg)
-begin : GTX_REF_CLK_CNT
-      begin
-            gtx_refclk_count = gtx_refclk_count + 1;
-      end 
-end
-
-always @(posedge mmcm_clk_in)
-begin : GTX_TXOUTCLK_CNT
-      begin
-            gtx_txoutclk_count = gtx_txoutclk_count + 1;
-      end 
-end
-
-
-always @(posedge gtx0_txusrclk_i)
-begin : GTX_TXUSRCLK_CNT
-      begin
-            gtx_txusrclk_count = gtx_txusrclk_count + 1;
-      end 
-end
-
-always @(posedge gtx0_txusrclk2_i)
-begin : GTX_TXUSRCLK2_CNT
-      begin
-            gtx_txusrclk2_count = gtx_txusrclk2_count + 1;
-      end 
-end
-
-
-always @(posedge CLKIN_150)
-begin : CLKIN_150_CNT
-      begin
-            CLKIN_150_count = CLKIN_150_count + 1;
-      end 
-end
-
-assign rst_0 = GTXRESET_IN;  
-always @(posedge CLKIN_150)
-begin
- rst_1 <= rst_0;
- rst_2 <= rst_1;
- rst_3 <= rst_2;
-end
-
-assign rst_debounce = (rst_1 & rst_2 & rst_3);
-
-//assign rst_debounce = GTXRESET_IN;
-
-
-// SATA PHY output clock assignments
-assign sata_user_clk = gtx0_txusrclk2_i;
+        // SATA PHY output clock assignments
+        assign sata_user_clk = gtx0_txusrclk2_i;
 
 
 OOB_control OOB_control_i 
@@ -369,7 +293,6 @@ OOB_control OOB_control_i
        //-------- GTX Ports --------/
      	.clk				(gtx0_txusrclk2_i),
  	.reset		      		(gtx_reset),
-        .link_reset			(1'b0),
 	.rxreset			(rxreset),
  	.rx_locked			(PLLLKDET_OUT),
          // OOB generation and detection signals from GTX
@@ -381,10 +304,10 @@ OOB_control OOB_control_i
  	.rxelecidle			(rxelecidle0),
  	.txelecidle_out			(txelecidle),
  	.rxbyteisaligned		(RXBYTEISALIGNED0), 	
- 	.tx_dataout			(txdata),		// outgoing GTP data
- 	.tx_charisk_out			(tx_charisk_out),       // GTP charisk out    
- 	.rx_datain			(rxdata),              	// incoming GTP data 
- 	.rx_charisk_in			(rxcharisk),            // GTP charisk in 	
+ 	.tx_dataout			(txdata),		// outgoing GTX data
+ 	.tx_charisk_out			(tx_charisk_out),       // GTX charisk out    
+ 	.rx_datain			(rxdata),              	// incoming GTX data 
+ 	.rx_charisk_in			(rxcharisk),            // GTX charisk in 	
 	.gen2             		(1'b1),                 // for SATA Generation 2
         
        //----- USER DATA PORTS---------//        
@@ -398,15 +321,10 @@ OOB_control OOB_control_i
 	.CurrentState_out       	(CurrentState_out)
  );
 
-assign rxelecidle_out  = rxelecidle0;
+    assign rxelecidle_out  = rxelecidle0;
 
 
-    //  Static signal Assigments    
-    assign tied_to_ground_i             = 1'b0;
-    assign tied_to_ground_vec_i         = 64'h0000000000000000;
-    assign tied_to_vcc_i                = 1'b1;
-    assign tied_to_vcc_vec_i            = 8'hff;
-
+    
 //---------------------Dedicated GTX Reference Clock Inputs ---------------
     // The dedicated reference clock inputs you selected in the GUI are implemented using
     // IBUFDS_GTXE1 instances.
@@ -634,7 +552,53 @@ SATA_GTX_DUAL #
         .GTX1_TXCOMWAKE_IN              (gtx1_txcomwake_i)
 
     );
-        
+/* Note: The Transmitter Differential Voltage Swing is set by the TXDIFFCTRL parameter
+         in the GTX transceivers. It defaults to 4'b0000 resulting in a voltage of 110 mV p-p. 
+         Set it to 4'b1000 to raise the voltage to 810 mV p-p. (Refer Pg 174 of V6 GTX user guide). 
+         This is necessary for the transmission of OOB signals during PHY Initialization. */ 
+assign gtx0_txdiffctrl_i = 4'b1000; 
+assign gtx1_txdiffctrl_i = 4'b1000; 
+
+
+
+// Debugging
+always @(posedge gtx_refclk_bufg)
+begin : GTX_REF_CLK_CNT
+      begin
+            gtx_refclk_count <= gtx_refclk_count + 1;
+      end 
+end
+
+always @(posedge mmcm_clk_in)
+begin : GTX_TXOUTCLK_CNT
+      begin
+            gtx_txoutclk_count <= gtx_txoutclk_count + 1;
+      end 
+end
+
+
+always @(posedge gtx0_txusrclk_i)
+begin : GTX_TXUSRCLK_CNT
+      begin
+            gtx_txusrclk_count <= gtx_txusrclk_count + 1;
+      end 
+end
+
+always @(posedge gtx0_txusrclk2_i)
+begin : GTX_TXUSRCLK2_CNT
+      begin
+            gtx_txusrclk2_count <= gtx_txusrclk2_count + 1;
+      end 
+end
+
+
+always @(posedge CLKIN_150)
+begin : CLKIN_150_CNT
+      begin
+            CLKIN_150_count <= CLKIN_150_count + 1;
+      end 
+end
+
 
 // SATA PHY ILA
 wire [7:0] trig0;
@@ -698,7 +662,7 @@ assign trig5     = gtx_txoutclk_count;
 assign trig6     = gtx_txusrclk_count;
 assign trig7     = gtx_txusrclk2_count;
 assign trig8     = 16'b0;
-assign trig9     = CLKIN_200_count;
+assign trig9     = 16'b0;
 assign trig10    = CLKIN_150_count;
 
 endmodule

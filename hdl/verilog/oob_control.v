@@ -4,28 +4,9 @@
 // Author:      Ashwin Mendon 
 // Description: This module handles the Out-Of-Band (OOB) sinaling requirements
 //               for link initialization and synchronization 
-//              It has been modified from XAPP870 to support Xilinx Virtex 6 GTX
+//              It has been modified from Xilinx XAPP870 to support Virtex 6 GTX
 //              transceivers 
 //*****************************************************************************/
-
-// Copyright (C) 2012
-// Ashwin A. Mendon
-//
-// This file is part of SATA2 core.
-//
-// This program is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.  
-
 
 module OOB_control (
 
@@ -34,7 +15,6 @@ module OOB_control (
  oob_control_ila_control,
  
  /**** GTX ****/
- link_reset,
  rxreset,	// GTX PCS reset
  rx_locked,	// GTX PLL is locked
  gen2,		// Generation 2 speed
@@ -73,7 +53,6 @@ module OOB_control (
 	input		clk;
 	input 		reset;
         input   [35:0]  oob_control_ila_control;
-	input           link_reset;
 	input 		rx_locked;
 	input           gen2;
         // Added for GTX	
@@ -123,16 +102,12 @@ module OOB_control (
         parameter LINK_LAYER = 4'b11;
 
 	reg	[7:0]	CurrentState, NextState;
-	reg	[7:0]	count160;
 	reg	[17:0]	count;
-	reg	[4:0]	count160_round;
 	reg	[3:0]	align_char_cnt_reg;
 	reg		align_char_cnt_rst, align_char_cnt_inc;
 	reg		count_en;
-	reg		tx_charisk_r, tx_charisk, tx_charisk_next;
+	reg		tx_charisk, tx_charisk_next;
 	reg		txelecidle, txelecidle_next;
-	reg		count160_done, count160_go;
-	reg	[1:0]	align_byte_count ;    // Counter for ALIGN Byte Count
 	reg        	linkup_r, linkup_r_next;
 	reg		rxreset; 
 	reg	[31:0]  tx_datain_r;
@@ -146,7 +121,6 @@ module OOB_control (
         reg     [1:0]   prim_type, prim_type_next;
       
 	wire		align_det, sync_det, cont_det, sof_det, eof_det, x_rdy_det, r_err_det, r_ok_det;
-	wire		comreset_done, dev_cominit_done, host_comwake_done, dev_comwake_done;
         reg             align_en, align_en_r;
         reg             rxelecidle_r;
         reg     [31:0]  rx_datain_r;
@@ -370,88 +344,55 @@ always@(posedge clk or posedge reset)
 begin : Seq_FSM 
 	if (reset)
         begin
-		CurrentState       = host_comreset;
-                prim_type          = ALIGN;
-                tx_charisk         = 1'b0;
-                txelecidle         = 1'b1;
-                linkup_r           = 1'b0;
-                align_en_r         = 1'b0;
-                rxelecidle_r       = 1'b0;
-                rx_datain_r        = 32'b0;
-                rx_charisk_in_r    = 4'b0;
-                rxbyteisaligned_r  = 1'b0; 
-                cominitdet_r       = 1'b0;
-                comwakedet_r       = 1'b0;
+		CurrentState       <= host_comreset;
+                prim_type          <= ALIGN;
+                tx_charisk         <= 1'b0;
+                txelecidle         <= 1'b1;
+                linkup_r           <= 1'b0;
+                align_en_r         <= 1'b0;
+                rxelecidle_r       <= 1'b0;
+                rx_datain_r        <= 32'b0;
+                rx_charisk_in_r    <= 4'b0;
+                rxbyteisaligned_r  <= 1'b0; 
+                cominitdet_r       <= 1'b0;
+                comwakedet_r       <= 1'b0;
 	end
 	else
         begin
-		CurrentState      = NextState;
-                prim_type         = prim_type_next;
-                tx_charisk        = tx_charisk_next;
-                txelecidle        = txelecidle_next;
-	        linkup_r          = linkup_r_next;
-                align_en_r        = align_en;
-                rxelecidle_r      = rxelecidle;
-                rx_datain_r       = rx_datain;
-                rx_charisk_in_r   = rx_charisk_in; 
-                rxbyteisaligned_r = rxbyteisaligned; 
-                cominitdet_r      = cominitdet;
-                comwakedet_r      = comwakedet;
+		CurrentState      <= NextState;
+                prim_type         <= prim_type_next;
+                tx_charisk        <= tx_charisk_next;
+                txelecidle        <= txelecidle_next;
+	        linkup_r          <= linkup_r_next;
+                align_en_r        <= align_en;
+                rxelecidle_r      <= rxelecidle;
+                rx_datain_r       <= rx_datain;
+                rx_charisk_in_r   <= rx_charisk_in; 
+                rxbyteisaligned_r <= rxbyteisaligned; 
+                cominitdet_r      <= cominitdet;
+                comwakedet_r      <= comwakedet;
         end
 end
 
-
-always@(posedge clk)
-begin : Tx_Charisk
-        begin
-                tx_charisk_r = tx_charisk;
-        end
-end
-
-always@(posedge clk or posedge reset)
-begin : comreset_OOB_count
-	if (reset)
-	begin
-		count160 = 8'b0;
-		count160_round = 5'b0;
-	end	
-	else if (count160_go)
-	begin  
-	      if (count160 == 8'h10 )
-	      begin
-		    count160 = 8'b0;
-		    count160_round = count160_round + 1;
-	      end
-	      else
-	            count160 = count160 + 1;
-	end
-	else
-	begin
-		count160 = 8'b0;
-		count160_round = 5'b0;
-	end			
-end
 
 always@(posedge clk or posedge reset)
 begin : freecount
 	if (reset)
 	begin
-		count = 18'b0;
+		count <= 18'b0;
 	end	
 	else if (count_en)
 	begin  
-		count = count + 1;
+		count <= count + 1;
 	end
      	else
      	begin
-		count = 18'b0;
+		count <= 18'b0;
 
 	end
 end
 
 
-assign comreset_done = (CurrentState == host_comreset && count160_round == 5'h15) ? 1'b1 : 1'b0;
-assign host_comwake_done = (CurrentState == host_comwake && count160_round == 5'h0b) ? 1'b1 : 1'b0;
 
 assign txcominit = txcominit_r;
 assign txcomwake = txcomwake_r;
@@ -504,23 +445,20 @@ always@(posedge clk or posedge reset)
 begin : align_cnt
 	if (reset)
         begin
-           align_count = 9'b0;
-           align_byte_count = 2'b0;
+           align_count <= 9'b0;
         end 
 	else if (align_count < 9'h0FF) //255
         begin       
            if (align_count == 9'h001) //de-assert after 2 ALIGN primitives
            begin
-                align_en = 1'b0;
+                align_en <= 1'b0;
            end  
-           align_count = align_count + 1;
-           align_byte_count = align_byte_count + 1;
+           align_count <= align_count + 1;
         end
      	else
         begin     
-           align_byte_count = 2'b0;
-           align_count = 9'b0;
-           align_en = 1'b1;
+           align_count <= 9'b0;
+           align_en <= 1'b1;
         end
 end
 
@@ -583,7 +521,7 @@ assign trig1[9] = align_en_r;
 assign trig1[8]  = rxelecidle_r;
 assign trig1[7:0] = CurrentState_out;
 assign trig2[15:7] = align_count;
-assign trig2[6:5] = align_byte_count;
+assign trig2[6:5] = 2'b0;
 assign trig2[4] = cominitdet_r;
 assign trig2[3] = comwakedet_r;
 assign trig2[2] = align_det;

@@ -579,8 +579,7 @@ module SATA_GTX #
         .TXUSRCLK2                      (TXUSRCLK2_IN),
         //-------------- Transmit Ports - TX Driver and OOB signaling --------------
         .TXBUFDIFFCTRL                  (3'b100),
-        //.TXDIFFCTRL                    TXDIFFCTRL_IN,
-        .TXDIFFCTRL                     (4'b1000),  
+        .TXDIFFCTRL                     (TXDIFFCTRL_IN),
         .TXINHIBIT                      (tied_to_ground_i),
         .TXN                            (TXN_OUT),
         .TXP                            (TXP_OUT),
