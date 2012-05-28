@@ -192,7 +192,8 @@ begin
 
    -- SATA Core Output Signals
    ready_for_cmd    <= sata_ready_for_cmd_i;      
-   sata_core_full   <= write_fifo_full_i;
+   --sata_core_full   <= write_fifo_full_i;
+   sata_core_full   <= user_fifo_prog_full;
    sata_core_empty  <= read_fifo_empty;
    SATA_USER_DATA_CLK_OUT  <= sata_user_clk;
    LINKUP           <= LINKUP_i; 
