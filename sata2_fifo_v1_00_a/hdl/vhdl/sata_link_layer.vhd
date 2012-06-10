@@ -927,6 +927,7 @@ begin
     prim_type_tx_next        <= prim_type_tx;
     FIS_word_count_next      <= FIS_word_count;
     tx_sector_count_next     <= tx_sector_count;
+    tx_charisk_TX_FRAME      <= '1'; 
     ---------------------------------------------------------------------------
     -- Finite State Machine
     ---------------------------------------------------------------------------
@@ -963,6 +964,7 @@ begin
 
      -- x3
      when send_FIS => 
+         tx_charisk_TX_FRAME      <= '0'; 
      --Send FIS data
          prim_type_tx_next <= FIS;
          -- ALIGN primitives after 256 DWORDS
@@ -980,6 +982,7 @@ begin
          -- Transmit buffer empty condition
          if (tx_fifo_almost_empty = '1') then
             if (align_en_out = '0') then
+               tx_charisk_TX_FRAME  <= '1'; 
                prim_type_tx_next <= HOLD;
                tx_frame_next  <= send_HOLD;
             end if;
@@ -992,6 +995,7 @@ begin
          end if; 
          if ((tx_sector_count >= conv_std_logic_vector(sector_count, 16)) or (FIS_word_count >= FIS_count_value)) then
             if (align_en_out = '0') then
+               tx_charisk_TX_FRAME      <= '0'; 
 	       FIS_word_count_next <= (others => '0');
                tx_fifo_re_next   <= '1';
                prim_type_tx_next <= FIS;
@@ -1078,9 +1082,8 @@ begin
 
 -- ASYNCHRONOUS MUXES
  tx_charisk_RX_FRAME <= '1';
- tx_charisk_TX_FRAME <= '0' when (((tx_frame_curr = send_FIS) and (tx_fifo_almost_empty = '0')) or ((tx_frame_curr=send_FIS) and 
-			(tx_fifo_almost_empty = '1') and (master_fsm_curr = H2D_REG_FIS))) else '1';
- --tx_charisk_TX_FRAME <= '0' when ((tx_frame_curr = send_FIS) and (tx_fifo_almost_empty = '0')) else '1';
+ --tx_charisk_TX_FRAME <= '0' when (((tx_frame_curr = send_FIS) and (tx_fifo_almost_empty = '0')) or ((tx_frame_curr=send_FIS) and 
+	--		(tx_fifo_almost_empty = '1') and (master_fsm_curr = H2D_REG_FIS))) else '1';
  --tx_charisk_out      <= '0' when ((tx_frame_curr = send_FIS) or (prim_type_tx = PRIM_SCRM)) else tx_charisk_RX_FRAME when (rx_tx_state_sel = '0') else tx_charisk_TX_FRAME; 
  tx_charisk_out      <= tx_charisk_RX_FRAME when (rx_tx_state_sel = '0') else tx_charisk_TX_FRAME; 
  prim_type           <= prim_type_rx when (rx_tx_state_sel = '0') else prim_type_tx;
