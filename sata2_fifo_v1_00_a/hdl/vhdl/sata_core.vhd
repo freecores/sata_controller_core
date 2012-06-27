@@ -161,10 +161,11 @@ architecture BEHAV of sata_core is
 -- USER FIFO DECLARATION
   component user_fifo
 	port (
-	clk: IN std_logic;
 	rst: IN std_logic;
+	wr_clk: IN std_logic;
 	din: IN std_logic_VECTOR(31 downto 0);
 	wr_en: IN std_logic;
+	rd_clk: IN std_logic;
 	rd_en: IN std_logic;
 	dout: OUT std_logic_VECTOR(31 downto 0);
 	full: OUT std_logic;
@@ -181,9 +182,10 @@ begin
   USER_FIFO_i : user_fifo
    		port map (
 			rst => reset,
-			clk => sata_user_clk,
+			wr_clk => SATA_USER_DATA_CLK_IN,
 			din => sata_din,
 			wr_en => sata_din_we,
+			rd_clk => sata_user_clk,
 			dout => user_fifo_dout,
 			rd_en => user_din_re,
 			full => user_fifo_full,
