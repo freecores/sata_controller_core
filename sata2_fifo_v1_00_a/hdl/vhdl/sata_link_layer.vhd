@@ -275,6 +275,7 @@ architecture BEHAV of sata_link_layer is
   signal rx_fifo_din       : std_logic_vector(0 to DATA_WIDTH-1);
   signal rx_fifo_dout      : std_logic_vector(0 to DATA_WIDTH-1);
   signal rx_fifo_data_count      : std_logic_vector(0 to 9);
+  signal rx_fifo_reset      : std_logic;
 
   -----------------------------------------------------------------------------
   -- Pre-Scramble Write FIFO from Command Layer
@@ -1187,11 +1188,12 @@ port map
 ---------------------------------------------------------------------------
     rx_fifo_din <= rx_datain;
     rx_fifo_re  <= descrambler_din_re_r; 
+    rx_fifo_reset <= sw_reset or descrambler_reset;     
      
     RX_FIFO : rx_tx_fifo
 	port map (
            clk    => sata_user_clk,
-           rst    => sw_reset,
+           rst    => rx_fifo_reset,
            rd_en  => rx_fifo_re,
 	   din    => rx_fifo_din,
 	   wr_en  => rx_fifo_we_next,
