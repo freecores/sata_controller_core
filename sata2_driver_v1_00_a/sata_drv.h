@@ -22,7 +22,7 @@
 /*
  * Minor number and partition management.
  */
-#define SATA_MINORS	2
+#define SATA_MINORS	16
 #define MINOR_SHIFT	4
 #define DEVNUM(kdevnum)	(MINOR(kdev_t_to_nr(kdevnum)) >> MINOR_SHIFT
 
