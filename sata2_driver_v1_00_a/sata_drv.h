@@ -30,7 +30,7 @@
  * The internal representation of our device.
  */
 struct sata_dev {
-        int size;                       /* Device size in sectors */
+        unsigned long long size;        /* Device size in sectors */
         short users;                    /* How many users */
         short media_change;             /* Flag a media change? */
         spinlock_t lock;                /* For mutual exclusion */
